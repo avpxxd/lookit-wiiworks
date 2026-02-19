@@ -1,1 +1,111 @@
-<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>3D Look-Around Space</title>\n    <style>\n        canvas { background: #000; display: block; margin: 0 auto; }\n    </style>\n</head>\n<body>\n    <canvas id=\"canvas\" width=\"800\" height=\"600\"></canvas>\n    <script>\n        const canvas = document.getElementById('canvas');\n        const ctx = canvas.getContext('2d');\n        let angleX = 0, angleY = 0, angleZ = 0;\n        let wiiuEnabled = false;\n\n        function updateGamepadState() {\n            if (window.wiiu && window.wiiu.gamepad && window.wiiu.gamepad.isEnabled && window.wiiu.gamepad.isDataValid) {\n                angleX = window.wiiu.gamepad.angleX;\n                angleY = window.wiiu.gamepad.angleY;\n                angleZ = window.wiiu.gamepad.angleZ;\n                wiiuEnabled = true;\n            } else {\n                wiiuEnabled = false;\n            }\n        }\n\n        function perspective(fov, aspect, near, far) {\n            const f = 1.0 / Math.tan(fov / 2);\n            return [f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) / (near - far), -1, 0, 0, (2 * far * near) / (near - far)];\n        }\n\n        function drawCube(x, y, z) {\n            const size = 50;\n            // Simple perspective projection and drawing wireframe\n            const scale = 500 / (z + 500);\n            const projectedX = (x * scale) + canvas.width / 2;\n            const projectedY = (y * scale) + canvas.height / 2;\n\n            ctx.moveTo(projectedX - size, projectedY - size);\n            ctx.lineTo(projectedX + size, projectedY - size);\n            ctx.lineTo(projectedX + size, projectedY + size);\n            ctx.lineTo(projectedX - size, projectedY + size);\n            ctx.lineTo(projectedX - size, projectedY - size);\n        }\n\n        function drawScene() {\n            ctx.clearRect(0, 0, canvas.width, canvas.height);\n\n            // Rotate cube positions based on angles and draw cubes\n            const cubes = [[-200, 0, -700], [200, 0, -700], [0, -200, -700], [0, 200, -700]];\n            for (let cube of cubes) {\n                drawCube(cube[0], cube[1], cube[2]);\n            }\n\n            ctx.stroke();\n        }\n\n        setInterval(() => {\n            updateGamepadState();\n            if (wiiuEnabled) {\n                drawScene();\n            }\n        }, 100);\n    </script>\n</body>\n</html>\n
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Look-around Space</title>
+    <style>
+        canvas { border: 1px solid black; }
+        body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+    </style>
+</head>
+<body>
+<canvas id="canvas" width="800" height="600"></canvas>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+const cubes = [
+    { x: -50, y: 0, z: -100, size: 30 },
+    { x: 50, y: 0, z: -100, size: 30 },
+    { x: 0, y: 50, z: -100, size: 30 },
+];
+
+let angleX = 0, angleY = 0, angleZ = 0;
+let motionEnabled = true;
+
+function rotatePoint(point) {
+    const { x, y, z } = point;
+    // Rotate around Y
+    const cosY = Math.cos(angleY);
+    const sinY = Math.sin(angleY);
+    const rotatedX = x * cosY - z * sinY;
+    const rotatedZ = x * sinY + z * cosY;
+    // Rotate around X
+    const cosX = Math.cos(angleX);
+    const sinX = Math.sin(angleX);
+    const rotatedY = y * cosX - rotatedZ * sinX;
+    const finalZ = y * sinX + rotatedZ * cosX;
+    return { x: rotatedX, y: rotatedY, z: finalZ };
+}
+
+function project(point) {
+    const { x, y, z } = point;
+    const scale = 200 / (z + 400);
+    const x2d = x * scale + canvas.width / 2;
+    const y2d = -y * scale + canvas.height / 2;
+    return { x: x2d, y: y2d };
+}
+
+function drawCube(cube) {
+    const { size } = cube;
+    const vertices = [
+        { x: -size, y: -size, z: size },
+        { x: size, y: -size, z: size },
+        { x: size, y: size, z: size },
+        { x: -size, y: size, z: size },
+        { x: -size, y: -size, z: -size },
+        { x: size, y: -size, z: -size },
+        { x: size, y: size, z: -size },
+        { x: -size, y: size, z: -size },
+    ].map(rotatePoint);
+    const projected = vertices.map(project);
+    ctx.beginPath();
+    for (let i = 0; i < 4; i++) {
+        ctx.moveTo(projected[i].x, projected[i].y);
+        ctx.lineTo(projected[(i + 1) % 4].x, projected[(i + 1) % 4].y);
+    }
+    for (let i = 4; i < 8; i++) {
+        ctx.moveTo(projected[i].x, projected[i].y);
+        ctx.lineTo(projected[i-4].x, projected[i-4].y);
+    }
+    for (let i = 4; i < 8; i++) {
+        ctx.moveTo(projected[i].x, projected[i].y);
+        ctx.lineTo(projected[(i + 1) % 4 + 4].x, projected[(i + 1) % 4 + 4].y);
+    }
+    ctx.stroke();
+}
+
+function drawGrid() {
+    ctx.beginPath();
+    for (let i = -200; i < 200; i += 20) {
+        ctx.moveTo(i + canvas.width / 2, -200 + canvas.height / 2);
+        ctx.lineTo(i + canvas.width / 2, 200 + canvas.height / 2);
+        ctx.moveTo(-200 + canvas.width / 2, i + canvas.height / 2);
+        ctx.lineTo(200 + canvas.width / 2, i + canvas.height / 2);
+    }
+    ctx.strokeStyle = 'lightgray';
+    ctx.stroke();
+}
+
+function update() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawGrid();
+    cubes.forEach(drawCube);
+    if (motionEnabled) {
+        angleY += 0.01;
+    }
+}
+
+setInterval(update, 50);
+
+// Mock Wii U GamePad integration
+const isEnabled = true; // Replace with actual check
+const isDataValid = true; // Replace with actual check
+if (isEnabled && isDataValid) {
+    // Implement motion control updates here
+}
+
+</script>
+</body>
+</html>
