@@ -40,9 +40,12 @@
     <canvas id="canvas" width="854" height="480"></canvas>
     <div id="info">
         <div id="warning">Waiting for Wii U GamePad...</div>
-        <div>Pitch: <span id="pitch">0.00</span>°</div>
-        <div>Yaw: <span id="yaw">0.00</span>°</div>
-        <div>Roll: <span id="roll">0.00</span>°</div>
+        <div>Pitch (Up/Down): <span id="pitch">0.00</span>°</div>
+        <div>Yaw (Left/Right): <span id="yaw">0.00</span>°</div>
+        <div>Roll (Rotation): <span id="roll">0.00</span>°</div>
+        <div style="margin-top: 10px; font-size: 10px;">
+            AccZY: <span id="accZY">0.00</span> | angleZ: <span id="angleZ">0.00</span> | angleY: <span id="angleY">0.00</span>
+        </div>
     </div>
 
     <script>
@@ -224,9 +227,23 @@
                     warningElm.innerHTML = "Wii U GamePad Connected!";
                     warningElm.className = "connected";
                     
+                    // CORRECTED CONTROLS based on testing:
+                    // AccZY for up/down (most accurate)
+                    var accZY = Math.sqrt(state.accZ * state.accZ + state.accY * state.accY);
+                    
+                    // angleZ for left/right (most accurate)
                     cameraYaw = state.angleZ * 2;
-                    cameraPitch = -state.angleX * 2;
+                    
+                    // AccZY for up/down pitch control
+                    cameraPitch = accZY * 2;
+                    
+                    // angleY for screen rotation (fixed)
                     cameraRoll = state.angleY;
+                    
+                    // Update debug display
+                    document.getElementById('accZY').textContent = accZY.toFixed(4);
+                    document.getElementById('angleZ').textContent = state.angleZ.toFixed(4);
+                    document.getElementById('angleY').textContent = state.angleY.toFixed(4);
                 }
             } else {
                 state = new DummyData();
