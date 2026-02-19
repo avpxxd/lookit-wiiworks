@@ -1,1 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no">
+    <title>Wii U GamePad - 3D Look Around Space</title>
+    <meta name="description" content="3D look-around space controlled by Wii U GamePad motion sensors">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            max-width: 300px;
+        }
+        #warning {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div id="info">
+        <div id="warning">Waiting for Wii U GamePad data...</div>
+        <div>Pitch (Up/Down): <span id="pitch">0</span>°</div>
+        <div>Yaw (Left/Right): <span id="yaw">0</span>°</div>
+        <div>Roll (Rotation): <span id="roll">0</span>°</div>
+        <div style="margin-top: 10px; font-size: 10px;">
+            Move the GamePad to look around the 3D space
+        </div>
+    </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Three.js scene setup
+        let scene, camera, renderer;
+        let pitch = 0, yaw = 0, roll = 0;
+        let isWiiUDetected = false;
+
+        function initThreeJS() {
+            // Create scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x111122);
+
+            // Create camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 0, 0);
+
+            // Create renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // Add ambient light
+            const ambientLight = new THREE.AmbientLight(0x404040, 2);
+            scene.add(ambientLight);
+
+            // Add directional light
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(5, 10, 5);
+            scene.add(directionalLight);
+
+            // Create a 3D environment to look around
+            createEnvironment();
+
+            // Handle window resize
+            window.addEventListener('resize', onWindowResize, false);
+        }
+
+        function createEnvironment() {
+            // Create a grid floor
+            const gridHelper = new THREE.GridHelper(50, 50, 0x00ff00, 0x004400);
+            scene.add(gridHelper);
+
+            // Create floating cubes at different positions
+            const cubeGeometry = new THREE.BoxGeometry(2, 2, 2);
+            const colors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff];
+            
+            for (let i = 0; i < 20; i++) {
+                const material = new THREE.MeshPhongMaterial({ 
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    shininess: 100
+                });
+                const cube = new THREE.Mesh(cubeGeometry, material);
+                
+                cube.position.x = (Math.random() - 0.5) * 40;
+                cube.position.y = (Math.random() - 0.5) * 20 + 5;
+                cube.position.z = (Math.random() - 0.5) * 40;
+                
+                cube.rotation.x = Math.random() * Math.PI;
+                cube.rotation.y = Math.random() * Math.PI;
+                
+                scene.add(cube);
+            }
+
+            // Create spheres
+            const sphereGeometry = new THREE.SphereGeometry(1, 32, 32);
+            for (let i = 0; i < 15; i++) {
+                const material = new THREE.MeshPhongMaterial({ 
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    shininess: 100
+                });
+                const sphere = new THREE.Mesh(sphereGeometry, material);
+                
+                sphere.position.x = (Math.random() - 0.5) * 40;
+                sphere.position.y = (Math.random() - 0.5) * 20 + 5;
+                sphere.position.z = (Math.random() - 0.5) * 40;
+                
+                scene.add(sphere);
+            }
+
+            // Create a skybox-like environment
+            const starGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+            const starMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            
+            for (let i = 0; i < 200; i++) {
+                const star = new THREE.Mesh(starGeometry, starMaterial);
+                const radius = 30 + Math.random() * 20;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.random() * Math.PI;
+                
+                star.position.x = radius * Math.sin(phi) * Math.cos(theta);
+                star.position.y = radius * Math.sin(phi) * Math.sin(theta);
+                star.position.z = radius * Math.cos(phi);
+                
+                scene.add(star);
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Wii U GamePad data structure
+        function DummyData() {
+            this.hold = 0;
+            this.lStickX = 0;
+            this.lStickY = 0;
+            this.rStickX = 0;
+            this.rStickY = 0;
+            this.gyroX = 0;
+            this.gyroY = 0;
+            this.gyroZ = 0;
+            this.angleX = 0;
+            this.angleY = 0;
+            this.angleZ = 0;
+            this.accX = 0;
+            this.accY = 0;
+            this.accZ = 0;
+            this.dirXx = 1.0;
+            this.dirXy = 0.0;
+            this.dirXz = 0.0;
+            this.dirYx = 0.0;
+            this.dirYy = 1.0;
+            this.dirYz = 0.0;
+            this.dirZx = 0.0;
+            this.dirZy = 0.0;
+            this.dirZz = 1.0;
+            this.tpTouch = 0;
+            this.tpValidity = 0;
+            this.contentX = 0;
+            this.contentY = 0;
+        }
+
+        // Process Wii U GamePad data
+        function processGamePadData() {
+            let state;
+            
+            // Try to get actual Wii U GamePad data
+            if (typeof wiiu !== "undefined" && wiiu.gamepad && wiiu.gamepad.update) {
+                state = wiiu.gamepad.update();
+                if (state) {
+                    isWiiUDetected = true;
+                    document.getElementById("warning").textContent = "Wii U GamePad Connected!";
+                    document.getElementById("warning").style.color = "#51cf66";
+                }
+            } else {
+                state = new DummyData();
+                // Use mouse for testing when not on Wii U
+                if (!isWiiUDetected) {
+                    document.getElementById("warning").textContent = "Not on Wii U - Using mouse for demo";
+                }
+            }
+
+            return state;
+        }
+
+        // Update camera rotation based on GamePad data
+        function updateCamera(state) {
+            // Calculate AccXY and AccZY for pitch control
+            const accXY = Math.sqrt(state.accX * state.accX + state.accY * state.accY);
+            const accZY = Math.sqrt(state.accZ * state.accZ + state.accY * state.accY);
+            
+            // Map sensor data to camera rotation
+            // angleZ for left/right (yaw)
+            yaw = -state.angleZ * 2; // Multiply for more sensitivity
+            
+            // angleX and AccZY for up/down (pitch)
+            pitch = state.angleX * 2;
+            
+            // angleY for roll (screen rotation)
+            roll = state.angleY;
+
+            // Apply rotation to camera
+            camera.rotation.order = 'YXZ';
+            camera.rotation.y = yaw;
+            camera.rotation.x = pitch;
+            camera.rotation.z = roll;
+
+            // Update UI
+            document.getElementById('pitch').textContent = (pitch * 180 / Math.PI).toFixed(1);
+            document.getElementById('yaw').textContent = (yaw * 180 / Math.PI).toFixed(1);
+            document.getElementById('roll').textContent = (roll * 180 / Math.PI).toFixed(1);
+        }
+
+        // Mouse controls for testing (when not on Wii U)
+        let mouseX = 0, mouseY = 0;
+        let isDragging = false;
+
+        document.addEventListener('mousedown', () => isDragging = true);
+        document.addEventListener('mouseup', () => isDragging = false);
+        document.addEventListener('mousemove', (event) => {
+            if (isDragging && !isWiiUDetected) {
+                mouseX += event.movementX * 0.002;
+                mouseY += event.movementY * 0.002;
+                mouseY = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, mouseY));
+                
+                camera.rotation.y = mouseX;
+                camera.rotation.x = mouseY;
+                
+                document.getElementById('pitch').textContent = (mouseY * 180 / Math.PI).toFixed(1);
+                document.getElementById('yaw').textContent = (mouseX * 180 / Math.PI).toFixed(1);
+                document.getElementById('roll').textContent = '0.0';
+            }
+        });
+
+        // Touch controls for mobile testing
+        let touchStartX = 0, touchStartY = 0;
+        document.addEventListener('touchstart', (event) => {
+            touchStartX = event.touches[0].clientX;
+            touchStartY = event.touches[0].clientY;
+        });
+        document.addEventListener('touchmove', (event) => {
+            if (!isWiiUDetected) {
+                const deltaX = (event.touches[0].clientX - touchStartX) * 0.005;
+                const deltaY = (event.touches[0].clientY - touchStartY) * 0.005;
+                
+                mouseX += deltaX;
+                mouseY += deltaY;
+                mouseY = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, mouseY));
+                
+                touchStartX = event.touches[0].clientX;
+                touchStartY = event.touches[0].clientY;
+                
+                camera.rotation.y = mouseX;
+                camera.rotation.x = mouseY;
+                
+                document.getElementById('pitch').textContent = (mouseY * 180 / Math.PI).toFixed(1);
+                document.getElementById('yaw').textContent = (mouseX * 180 / Math.PI).toFixed(1);
+                document.getElementById('roll').textContent = '0.0';
+            }
+        });
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Get GamePad data and update camera
+            const state = processGamePadData();
+            if (isWiiUDetected) {
+                updateCamera(state);
+            }
+            
+            // Render the scene
+            renderer.render(scene, camera);
+        }
+
+        // Initialize and start
+        initThreeJS();
+        animate();
+    </script>
+</body>
+</html>
